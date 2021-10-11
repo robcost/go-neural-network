@@ -16,6 +16,9 @@ var num_inputs = 4
 var streetlights = mat.NewDense(num_inputs, input_size, []float64{1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1})
 var walk_vs_stop = mat.NewVecDense(num_inputs, []float64{1, 1, 0, 0})
 
+// not yet implemented
+//var batch_size = 100
+
 func bool2float64(b bool) float64 {
 	if b {
 		return 1
@@ -61,16 +64,17 @@ func main() {
 	}
 	var weights_1_2 = *mat.NewVecDense(hidden_size, data_1_2)
 
-	/*
-		// static weights for testing
-		var weights_0_1 = *mat.NewDense(3, 4, []float64{-0.16595599, 0.44064899, -0.99977125, -0.39533485, -0.70648822, -0.81532281, -0.62747958, -0.30887855, -0.20646505, 0.07763347, -0.16161097, 0.370439})
-		var weights_1_2 = *mat.NewVecDense(4, []float64{-0.5910955, 0.75623487, -0.94522481, 0.34093502})
-	*/
-
 	w01 := &weights_0_1
 	w12 := &weights_1_2
 
-	for iteration := 1; iteration <= 200; iteration++ {
+	// create drop out mask
+	var data_mask = make([]float64, hidden_size) // weight matrix needs to be num input layer nodes times hidden layer nodes
+	for i := range data_mask {
+		data_mask[i] = rand.NormFloat64() / 5
+	}
+	var dropout_mask = *mat.NewVecDense(hidden_size, data_mask)
+
+	for iteration := 1; iteration <= 1000; iteration++ {
 
 		fmt.Printf("Iteration: %v", iteration)
 		fmt.Println()
@@ -85,6 +89,12 @@ func main() {
 
 			// run relu on the layer to zero-out any negative values
 			var layer_1 = relu(layer_1_input)
+
+			// multiply layer 1 by the dropout mask of random 0/1's
+			layer_1.MulVec(layer_1, &dropout_mask)
+
+			// multiple each element by 2 now that we have dropped 50% of the values, so we don't skew the signal downstream
+			layer_1.MulElemVec(layer_1, mat.NewVecDense(1, []float64{2}))
 
 			// run dot-product of layer_1 with associated weights
 			layer_2 := mat.Dot(layer_1, w12) // Number of Cols in 'a' must match number of Rows in 'b'.
@@ -107,8 +117,8 @@ func main() {
 			var layer_1_delta mat.VecDense
 			layer_1_delta.MulElemVec(layer_1_delta_dot.TVec(), layer_1_deriv)
 
-			fmt.Printf("Layer 1 Delta: %v", layer_1_delta)
-			fmt.Println()
+			// apply dropout to layer 1 delta so we take the dropout into account during back-propagation.
+			layer_1_delta.MulVec(&layer_1_delta, &dropout_mask)
 
 			// update values for weights_1_2
 			var weights_1_2_input mat.Dense

@@ -45,6 +45,50 @@ func relu2deriv(x mat.VecDense) *mat.VecDense {
 	return outMat
 }
 
+func sigmoid(x mat.Dense) *mat.VecDense {
+	rawOj := x.RawMatrix().Data
+	out := make([]float64, len(rawOj))
+	for j := range rawOj {
+		// Little bit of magic
+		out[j] = 1.0 / (1.0 + math.Exp(-rawOj[j]))
+	}
+	var outMat = mat.NewVecDense(hidden_size, out)
+	return outMat
+}
+
+func sigmoid2deriv(x mat.VecDense) *mat.VecDense {
+	rawOj := x.RawVector().Data
+	out := make([]float64, len(rawOj))
+	for j := range rawOj {
+		// Little bit of magic
+		out[j] = rawOj[j] * (1 - rawOj[j])
+	}
+	var outMat = mat.NewVecDense(len(rawOj), out)
+	return outMat
+}
+
+func tanh(x mat.Dense) *mat.VecDense {
+	rawOj := x.RawMatrix().Data
+	out := make([]float64, len(rawOj))
+	for j := range rawOj {
+		// Little bit of magic
+		out[j] = math.Tanh(rawOj[j])
+	}
+	var outMat = mat.NewVecDense(hidden_size, out)
+	return outMat
+}
+
+func tanh2deriv(x mat.VecDense) *mat.VecDense {
+	rawOj := x.RawVector().Data
+	out := make([]float64, len(rawOj))
+	for j := range rawOj {
+		// Little bit of magic
+		out[j] = 1 - math.Pow(rawOj[j], 2)
+	}
+	var outMat = mat.NewVecDense(len(rawOj), out)
+	return outMat
+}
+
 func main() {
 
 	// Create random starting weights for layer 0_1
@@ -61,16 +105,10 @@ func main() {
 	}
 	var weights_1_2 = *mat.NewVecDense(hidden_size, data_1_2)
 
-	/*
-		// static weights for testing
-		var weights_0_1 = *mat.NewDense(3, 4, []float64{-0.16595599, 0.44064899, -0.99977125, -0.39533485, -0.70648822, -0.81532281, -0.62747958, -0.30887855, -0.20646505, 0.07763347, -0.16161097, 0.370439})
-		var weights_1_2 = *mat.NewVecDense(4, []float64{-0.5910955, 0.75623487, -0.94522481, 0.34093502})
-	*/
-
 	w01 := &weights_0_1
 	w12 := &weights_1_2
 
-	for iteration := 1; iteration <= 200; iteration++ {
+	for iteration := 1; iteration <= 1000; iteration++ {
 
 		fmt.Printf("Iteration: %v", iteration)
 		fmt.Println()
@@ -84,7 +122,7 @@ func main() {
 			layer_1_input.Mul(layer_0, w01) // Number of Cols in 'a' must match number of Rows in 'b'.
 
 			// run relu on the layer to zero-out any negative values
-			var layer_1 = relu(layer_1_input)
+			var layer_1 = tanh(layer_1_input)
 
 			// run dot-product of layer_1 with associated weights
 			layer_2 := mat.Dot(layer_1, w12) // Number of Cols in 'a' must match number of Rows in 'b'.
@@ -102,13 +140,10 @@ func main() {
 			var layer_1_delta_dot mat.VecDense
 			layer_1_delta_dot.MulVec(w12, layer_1_delta_input)
 
-			layer_1_deriv := relu2deriv(*layer_1)
+			layer_1_deriv := tanh2deriv(*layer_1)
 
 			var layer_1_delta mat.VecDense
 			layer_1_delta.MulElemVec(layer_1_delta_dot.TVec(), layer_1_deriv)
-
-			fmt.Printf("Layer 1 Delta: %v", layer_1_delta)
-			fmt.Println()
 
 			// update values for weights_1_2
 			var weights_1_2_input mat.Dense
